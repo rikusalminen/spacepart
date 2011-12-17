@@ -18,6 +18,21 @@ renderq_node_t *renderq_join_siblings(renderq_node_t *a, renderq_node_t *b)
     return a->key <= b->key ? a : b;
 }
 
+renderq_node_t *renderq_detach(renderq_node_t *node)
+{
+    renderq_node_t *next = node->next != node ? node->next : NULL;
+    renderq_node_t *child = node->child;
+
+    node->prev->next = node->next;
+    node->next->prev = node->prev;
+
+    node->next = node->prev = node;
+    node->child = NULL;
+    node->degree = -1;
+
+    return renderq_join_siblings(next, child);
+}
+
 static renderq_node_t *renderq_combine(renderq_node_t *a, renderq_node_t *b)
 {
     renderq_node_t *parent = a->key <= b->key ? a : b;
@@ -63,6 +78,8 @@ static void renderq_degree_bounds(renderq_node_t *root, int *min_deg, int *max_d
 
 renderq_node_t *renderq_compress(renderq_node_t *root)
 {
+    if(!root) return NULL;
+
     int min_degree, max_degree;
     renderq_degree_bounds(root, &min_degree, &max_degree);
 
@@ -98,22 +115,6 @@ renderq_node_t *renderq_compress(renderq_node_t *root)
 renderq_node_t *renderq_extract_min(renderq_node_t **root)
 {
     renderq_node_t *node = *root;
-    renderq_node_t *next = node->next != node ? node->next : NULL;
-    renderq_node_t *child = node->child;
-
-    // unlink node from sibling list
-    node->prev->next = node->next;
-    node->next->prev = node->prev;
-
-    // reset node
-    node->next = node->prev = node;
-    node->child = NULL;
-    node->degree = -1;
-
-     *root = (next == NULL && child == NULL)
-         ?  NULL
-         : renderq_compress(renderq_join_siblings(next, child));
-
+    *root = renderq_compress(renderq_detach(node));
     return node;
 }
-

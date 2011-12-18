@@ -1,11 +1,14 @@
 #ifndef SPACEPART_RENDERQ_H
 #define SPACEPART_RENDERQ_H
 
+struct scene_node_t;
+
 typedef struct renderq_node_t
 {
     struct renderq_node_t *child, *next, *prev;
     float key;
     int degree;
+    const struct scene_node_t *scene_node;
 } renderq_node_t;
 
 renderq_node_t *renderq_join_siblings(renderq_node_t *a, renderq_node_t *b);

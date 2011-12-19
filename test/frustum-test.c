@@ -33,6 +33,13 @@ int main()
         octree_root.mid[i] = (octree_root.min[i] + octree_root.max[i])/2.0;
     }
 
+    int num_octree_nodes = 8192;
+    octree_node_t octree_nodes[num_octree_nodes];
+    memset(octree_nodes, 0, sizeof(octree_nodes));
+    for(octree_node_t *node = octree_nodes+0; node != octree_nodes+num_octree_nodes; ++node)
+        node->parent = node+1 == octree_nodes+num_octree_nodes ? NULL : node+1;
+    octree_node_t *free_octree_nodes = octree_nodes+0;
+
     int num_scene_nodes = 1024*32;
     scene_node_t scene_nodes[num_scene_nodes];
     memset(scene_nodes, 0, sizeof(scene_nodes));
@@ -49,7 +56,7 @@ int main()
             scene_node->aabb_max[i] = scene_node->aabb_min[i] + size;
         }
 
-        octree_add(&octree_root, scene_node);
+        octree_add(&octree_root, scene_node, &free_octree_nodes);
     }
 
     int num_queue_nodes = num_scene_nodes;
@@ -71,12 +78,6 @@ int main()
     {
         renderq_node_t *node = renderq_extract_min(&queue);
 
-        printf("queue node: %4.1f\tmin: (%3.1f, %3.1f, %3.1f)\tmax: (%3.1f, %3.1f, %3.1f)\n",
-            node->key,
-            node->scene_node->aabb_min[0], node->scene_node->aabb_min[1], node->scene_node->aabb_min[2],
-            node->scene_node->aabb_max[0], node->scene_node->aabb_max[1], node->scene_node->aabb_max[2]
-            );
-
         ++count;
 
         assert(node->key >= prev_key);
@@ -87,10 +88,8 @@ int main()
 
     assert(count == num_queue_nodes);
 
-    printf("%d nodes in queue\n", count);
-
     for(scene_node_t *scene_node = scene_nodes + 0; scene_node != scene_nodes + num_scene_nodes; ++scene_node)
-        octree_remove(scene_node);
+        octree_remove(scene_node, &free_octree_nodes);
 
     return 0;
 }

@@ -5,12 +5,6 @@
 #include <spacepart/scene.h>
 #include <spacepart/octree.h>
 
-// TODO: Add a real allocator that reuses nodes
-#include <stdlib.h>
-int octree_allocs = 0;
-static octree_node_t *octree_node_allocate() { octree_allocs += 1; return calloc(1, sizeof(octree_node_t)); }
-static void octree_node_free(octree_node_t *node) { octree_allocs -= 1; free(node); }
-
 static int octree_octant(octree_node_t *tree_node, const float *point)
 {
     int octant = 0;
@@ -63,12 +57,13 @@ static void octree_add_nodes_child(octree_node_t *tree_node, scene_node_t *node_
     } while(node != node_list);
 }
 
-static octree_node_t *octree_split_octant(octree_node_t *tree_node, int octant)
+static octree_node_t *octree_split_octant(octree_node_t *tree_node, int octant, octree_node_t **free_nodes)
 {
     assert(!tree_node->children[octant]);
 
-    octree_node_t *child_node = octree_node_allocate();
-    // TODO: handle OOM situations
+    assert(*free_nodes); // TODO: handle OOM situations
+    octree_node_t *child_node = *free_nodes;
+    *free_nodes = child_node->parent;
 
     tree_node->children[octant] = child_node;
     child_node->parent = tree_node;
@@ -83,7 +78,7 @@ static octree_node_t *octree_split_octant(octree_node_t *tree_node, int octant)
     return child_node;
 }
 
-static octree_node_t *octree_add_node(octree_node_t *root_node, scene_node_t *scene_node)
+static octree_node_t *octree_add_node(octree_node_t *root_node, scene_node_t *scene_node, octree_node_t **free_nodes)
 {
     assert(scene_node->next == scene_node && scene_node->prev == scene_node);
     assert(scene_node->octree_node == NULL);
@@ -99,13 +94,14 @@ static octree_node_t *octree_add_node(octree_node_t *root_node, scene_node_t *sc
     }
 
     if(octant == -1) octree_add_node_root(node, scene_node);
-    else if(node->num_child_nodes == -1) return octree_add_node(octree_split_octant(node, octant), scene_node);
+    else if(node->num_child_nodes == -1)
+        return octree_add_node(octree_split_octant(node, octant, free_nodes), scene_node, free_nodes);
     else octree_add_node_child(node, scene_node, octant);
 
     return node;
 }
 
-static void octree_split(octree_node_t *tree_node)
+static void octree_split(octree_node_t *tree_node, octree_node_t **free_nodes)
 {
     if(!tree_node->child_nodes) return;
 
@@ -121,9 +117,9 @@ static void octree_split(octree_node_t *tree_node)
         assert(octant != -1);
 
         octree_node_t *child_node = tree_node->children[octant];
-        if(!child_node) child_node = octree_split_octant(tree_node, octant);
+        if(!child_node) child_node = octree_split_octant(tree_node, octant, free_nodes);
 
-        octree_add_node(child_node, node);
+        octree_add_node(child_node, node, free_nodes);
 
         node = next;
     } while(node != tree_node->child_nodes);
@@ -147,7 +143,7 @@ static void octree_remove_node(octree_node_t *tree_node, scene_node_t *scene_nod
     if(tree_node->child_nodes == scene_node) tree_node->child_nodes = next;
 }
 
-static void octree_merge(octree_node_t *tree_node)
+static void octree_merge(octree_node_t *tree_node, octree_node_t **free_nodes)
 {
     assert(tree_node->num_child_nodes == -1);
     tree_node->num_child_nodes = 0;
@@ -168,8 +164,8 @@ static void octree_merge(octree_node_t *tree_node)
         child_node->child_nodes = NULL;
         child_node->num_child_nodes = 0;
 
-        child_node->parent = NULL;
-        octree_node_free(child_node);
+        child_node->parent = *free_nodes;
+        *free_nodes = child_node;
     }
 }
 
@@ -205,17 +201,17 @@ static bool octree_should_split(octree_node_t *node)
     return node->num_child_nodes >= OCTREE_SPLIT_THRESHOLD;
 }
 
-void octree_add(octree_node_t *root_node, struct scene_node_t *scene_node)
+void octree_add(octree_node_t *root_node, struct scene_node_t *scene_node, octree_node_t **free_nodes)
 {
-    octree_node_t *tree_node = octree_add_node(root_node, scene_node);
+    octree_node_t *tree_node = octree_add_node(root_node, scene_node, free_nodes);
     if(octree_should_split(tree_node))
-        octree_split(tree_node);
+        octree_split(tree_node, free_nodes);
 }
 
-void octree_remove(struct scene_node_t *scene_node)
+void octree_remove(struct scene_node_t *scene_node, octree_node_t **free_nodes)
 {
     octree_node_t *tree_node = scene_node->octree_node;
     octree_remove_node(tree_node, scene_node);
     if(tree_node->parent && octree_should_merge(tree_node->parent))
-        octree_merge(tree_node->parent);
+        octree_merge(tree_node->parent, free_nodes);
 }

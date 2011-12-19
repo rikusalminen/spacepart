@@ -15,5 +15,6 @@ typedef struct scene_node_t
 } scene_node_t;
 
 scene_node_t *scene_join_nodes(scene_node_t *a, scene_node_t *b);
+scene_node_t *scene_node_detach(scene_node_t *node);
 
 #endif

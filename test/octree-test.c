@@ -24,7 +24,7 @@ int main()
         octree_root.mid[i] = (octree_root.min[i] + octree_root.max[i]) / 2.0;
     }
 
-    int num_octree_nodes = 8192;
+    int num_octree_nodes = 1024; // way too small, should test OOM
     octree_node_t octree_nodes[num_octree_nodes];
     memset(octree_nodes, 0, sizeof(octree_nodes));
     for(octree_node_t *node = octree_nodes+0; node != octree_nodes+num_octree_nodes; ++node)

@@ -39,7 +39,9 @@ static void octree_add_node_child(octree_node_t *tree_node, scene_node_t *scene_
     scene_node->octant = octant;
 
     tree_node->child_nodes = scene_join_nodes(tree_node->child_nodes, scene_node);
-    tree_node->num_child_nodes += 1;
+
+    if(tree_node->num_child_nodes != -1)
+        tree_node->num_child_nodes += 1;
 }
 
 static void octree_add_nodes_child(octree_node_t *tree_node, scene_node_t *node_list, int octant)
@@ -61,7 +63,7 @@ static octree_node_t *octree_split_octant(octree_node_t *tree_node, int octant, 
 {
     assert(!tree_node->children[octant]);
 
-    assert(*free_nodes); // TODO: handle OOM situations
+    if(!*free_nodes) return NULL;
     octree_node_t *child_node = *free_nodes;
     *free_nodes = child_node->parent;
 
@@ -94,38 +96,43 @@ static octree_node_t *octree_add_node(octree_node_t *root_node, scene_node_t *sc
     }
 
     if(octant == -1) octree_add_node_root(node, scene_node);
-    else if(node->num_child_nodes == -1)
-        return octree_add_node(octree_split_octant(node, octant, free_nodes), scene_node, free_nodes);
-    else octree_add_node_child(node, scene_node, octant);
+    else if(node->num_child_nodes != -1) octree_add_node_child(node, scene_node, octant);
+    else
+    {
+        octree_node_t *child_node = octree_split_octant(node, octant, free_nodes);
+        if(child_node)
+            return octree_add_node(child_node, scene_node, free_nodes);
+        else
+            octree_add_node_child(node, scene_node, octant);
+    }
 
     return node;
 }
 
 static void octree_split(octree_node_t *tree_node, octree_node_t **free_nodes)
 {
-    if(!tree_node->child_nodes) return;
+    tree_node->num_child_nodes = -1; // mark node as split
 
-    scene_node_t *node = tree_node->child_nodes;
-    do
+    while(tree_node->child_nodes)
     {
-        scene_node_t *next = node->next;
-        node->next = node->prev = node;
-        node->octree_node = NULL;
-
+        scene_node_t *node = tree_node->child_nodes;
         int octant = node->octant;
-        node->octant = -1;
         assert(octant != -1);
 
-        octree_node_t *child_node = tree_node->children[octant];
-        if(!child_node) child_node = octree_split_octant(tree_node, octant, free_nodes);
+        octree_node_t *child_node =
+            tree_node->children[octant] ?
+            tree_node->children[octant] :
+            octree_split_octant(tree_node, octant, free_nodes);
+        if(!child_node)
+            return;
+
+        tree_node->child_nodes = scene_node_detach(node);
+
+        node->octree_node = NULL;
+        node->octant = -1;
 
         octree_add_node(child_node, node, free_nodes);
-
-        node = next;
-    } while(node != tree_node->child_nodes);
-
-    tree_node->child_nodes = NULL;
-    tree_node->num_child_nodes = -1;
+    }
 }
 
 static void octree_remove_node(octree_node_t *tree_node, scene_node_t *scene_node)
@@ -193,7 +200,8 @@ static bool octree_should_merge(octree_node_t *node)
 
 static bool octree_should_split(octree_node_t *node)
 {
-    if(node->num_child_nodes == -1) return false;
+    if(node->num_child_nodes == -1)
+        return node->child_nodes != NULL;
 
     // TODO: prevent recursive splits with a sensible heuristic
 

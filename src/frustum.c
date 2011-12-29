@@ -90,6 +90,7 @@ static renderq_node_t *frustum_cull_nodes(
 static renderq_node_t *frustum_cull_octree_node(
     const float * restrict frustum,
     frustum_cull_t visibility,
+    int traversal_order,
     const octree_node_t *node,
     renderq_node_t **free_nodes)
 {
@@ -98,9 +99,10 @@ static renderq_node_t *frustum_cull_octree_node(
             frustum_cull_nodes(frustum, visibility, node->nodes, free_nodes),
             frustum_cull_nodes(frustum, visibility, node->child_nodes, free_nodes));
 
-    for(int i = 0; i < 8; ++i) // TODO: traverse child nodes in correct order
+    for(int i = 0; i < 8; ++i)
     {
-        octree_node_t *child_node = node->children[i];
+        int child = (traversal_order >> (i * 3)) & 0x3;
+        octree_node_t *child_node = node->children[child];
         if(!child_node) continue;
 
         frustum_cull_t child_visibility =
@@ -113,10 +115,36 @@ static renderq_node_t *frustum_cull_octree_node(
         queue =
             renderq_join_siblings(
                 queue,
-                frustum_cull_octree_node(frustum, child_visibility, child_node, free_nodes));
+                frustum_cull_octree_node(frustum, child_visibility, traversal_order, child_node, free_nodes));
     }
 
     return renderq_compress(queue);
+}
+
+static int frustum_traversal_order(const float *frustum)
+{
+#define ABS(x) ((x) < 0 ? -(x) : (x))
+    const float *near_plane = frustum + 4*4;
+    int major_axis =
+        (ABS(near_plane[0]) >= ABS(near_plane[1]) && ABS(near_plane[0]) >= ABS(near_plane[2])) ? 0 :
+        (ABS(near_plane[1]) >= ABS(near_plane[2])) ? 1 : 2;
+    int middle_axis =
+        (ABS(near_plane[(major_axis+1)%3]) >= ABS(near_plane[(major_axis+2)%3])) ?
+        (major_axis+1)%3 : (major_axis+2)%3;
+    int minor_axis =
+        (ABS(near_plane[(major_axis+1)%3]) >= ABS(near_plane[(major_axis+2)%3])) ?
+        (major_axis+2)%3 : (major_axis+1)%3;
+#undef ABS
+
+    int order = 0;
+    for(int i = 0; i < 8; ++i)
+        order |=
+            (((((i & 4) != 0)^(near_plane[major_axis] < 0)) ? 4 : 0) |
+            ((((i & 2) != 0)^(near_plane[middle_axis] < 0)) ? 2 : 0) |
+            ((((i & 1) != 0)^(near_plane[minor_axis] < 0)) ? 1 : 0))
+            << (i*3);
+
+    return order;
 }
 
 renderq_node_t *frustum_cull_octree(
@@ -129,5 +157,6 @@ renderq_node_t *frustum_cull_octree(
     if(visibility == FRUSTUM_OUTSIDE)
         return frustum_cull_nodes(frustum, FRUSTUM_INTERSECTS, root->nodes, free_nodes);
 
-    return frustum_cull_octree_node(frustum, visibility, root, free_nodes);
+    int traversal_order = frustum_traversal_order(frustum);
+    return frustum_cull_octree_node(frustum, visibility, traversal_order, root, free_nodes);
 }

@@ -25,7 +25,8 @@ int main()
         0.0, 0.0, 1.0, world_size,
     };
 
-    octree_node_t octree_root = { 0 };
+    octree_node_t octree_root;
+    memset(&octree_root, 0, sizeof(octree_node_t));
     for(int i = 0; i < 3; ++i)
     {
         octree_root.min[i] = -world_size;
@@ -34,15 +35,13 @@ int main()
     }
 
     int num_octree_nodes = 8192;
-    octree_node_t octree_nodes[num_octree_nodes];
-    memset(octree_nodes, 0, sizeof(octree_nodes));
+    octree_node_t *octree_nodes = calloc(num_octree_nodes, sizeof(octree_node_t));
     for(octree_node_t *node = octree_nodes+0; node != octree_nodes+num_octree_nodes; ++node)
         node->parent = node+1 == octree_nodes+num_octree_nodes ? NULL : node+1;
     octree_node_t *free_octree_nodes = octree_nodes+0;
 
     int num_scene_nodes = 1024*32;
-    scene_node_t scene_nodes[num_scene_nodes];
-    memset(scene_nodes, 0, sizeof(scene_nodes));
+    scene_node_t *scene_nodes = calloc(num_scene_nodes, sizeof(scene_node_t));
 
     const float min_size = 1, max_size = 100;
     for(scene_node_t *scene_node = scene_nodes + 0; scene_node != scene_nodes + num_scene_nodes; ++scene_node)
@@ -60,8 +59,7 @@ int main()
     }
 
     int num_queue_nodes = num_scene_nodes;
-    renderq_node_t queue_nodes[num_queue_nodes];
-    memset(queue_nodes, 0, sizeof(queue_nodes));
+    renderq_node_t *queue_nodes = calloc(num_queue_nodes, sizeof(renderq_node_t));
 
     renderq_node_t *free_nodes = 0;
     for(renderq_node_t *queue_node = queue_nodes + 0; queue_node != queue_nodes + num_queue_nodes; ++queue_node)
@@ -90,6 +88,10 @@ int main()
 
     for(scene_node_t *scene_node = scene_nodes + 0; scene_node != scene_nodes + num_scene_nodes; ++scene_node)
         octree_remove(scene_node, &free_octree_nodes);
+
+    free(queue_nodes);
+    free(scene_nodes);
+    free(octree_nodes);
 
     return 0;
 }

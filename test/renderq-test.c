@@ -6,7 +6,7 @@
 int main()
 {
     int num_nodes = 1024;
-    renderq_node_t nodes[num_nodes];
+    renderq_node_t *nodes = calloc(num_nodes, sizeof(renderq_node_t));
 
     for(renderq_node_t *node = nodes+0; node != nodes+num_nodes; ++node)
     {
@@ -34,6 +34,8 @@ int main()
     }
 
     assert(count == num_nodes);
+
+    free(nodes);
 
     return 0;
 }

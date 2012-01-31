@@ -25,14 +25,13 @@ int main()
     }
 
     int num_octree_nodes = 1024; // way too small, should test OOM
-    octree_node_t octree_nodes[num_octree_nodes];
-    memset(octree_nodes, 0, sizeof(octree_nodes));
+    octree_node_t *octree_nodes = calloc(num_octree_nodes, sizeof(octree_node_t));
     for(octree_node_t *node = octree_nodes+0; node != octree_nodes+num_octree_nodes; ++node)
         node->parent = node+1 == octree_nodes+num_octree_nodes ? NULL : node+1;
     octree_node_t *free_octree_nodes = octree_nodes+0;
 
     int num_nodes = 128*1024;
-    scene_node_t nodes[num_nodes];
+    scene_node_t *nodes = calloc(num_nodes, sizeof(scene_node_t));
 
     const float min_size = 1, max_size = 100;
     for(scene_node_t *node = nodes; node != nodes + num_nodes; ++node)
@@ -52,6 +51,9 @@ int main()
 
     for(scene_node_t *node = nodes; node != nodes + num_nodes; ++node)
         octree_remove(node, &free_octree_nodes);
+
+    free(nodes);
+    free(octree_nodes);
 
     return 0;
 }

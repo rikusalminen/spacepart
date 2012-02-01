@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#include <spacepart/scene.h>
+#include <spacepart/spacepart.h>
 #include <spacepart/octree.h>
 
 static int octree_octant(octree_node_t *tree_node, const float *point)
@@ -20,38 +20,38 @@ static int octree_select_octant(octree_node_t *tree_node, const float * restrict
     return (min_oct == max_oct) ? min_oct : -1;
 }
 
-static void octree_add_node_root(octree_node_t *tree_node, scene_node_t *scene_node)
+static void octree_add_node_root(octree_node_t *tree_node, spacepart_node_t *spacepart_node)
 {
-    assert(scene_node->next == scene_node && scene_node->prev == scene_node);
+    assert(spacepart_node->next == spacepart_node && spacepart_node->prev == spacepart_node);
 
-    scene_node->octree_node = tree_node;
-    scene_node->octant = -1;
+    spacepart_node->octree_node = tree_node;
+    spacepart_node->octant = -1;
 
-    tree_node->nodes = scene_join_nodes(tree_node->nodes, scene_node);
+    tree_node->nodes = spacepart_join_nodes(tree_node->nodes, spacepart_node);
     tree_node->num_nodes += 1;
 }
 
-static void octree_add_node_child(octree_node_t *tree_node, scene_node_t *scene_node, int octant)
+static void octree_add_node_child(octree_node_t *tree_node, spacepart_node_t *spacepart_node, int octant)
 {
-    assert(scene_node->next == scene_node && scene_node->prev == scene_node);
+    assert(spacepart_node->next == spacepart_node && spacepart_node->prev == spacepart_node);
 
-    scene_node->octree_node = tree_node;
-    scene_node->octant = octant;
+    spacepart_node->octree_node = tree_node;
+    spacepart_node->octant = octant;
 
-    tree_node->child_nodes = scene_join_nodes(tree_node->child_nodes, scene_node);
+    tree_node->child_nodes = spacepart_join_nodes(tree_node->child_nodes, spacepart_node);
 
     if(tree_node->num_child_nodes != -1)
         tree_node->num_child_nodes += 1;
 }
 
-static void octree_add_nodes_child(octree_node_t *tree_node, scene_node_t *node_list, int octant)
+static void octree_add_nodes_child(octree_node_t *tree_node, spacepart_node_t *node_list, int octant)
 {
     if(!node_list) return;
 
-    scene_node_t *node = node_list;
+    spacepart_node_t *node = node_list;
     do
     {
-        scene_node_t *next = node->next;
+        spacepart_node_t *next = node->next;
         node->next = node->prev = node;
 
         octree_add_node_child(tree_node, node, octant);
@@ -80,30 +80,30 @@ static octree_node_t *octree_split_octant(octree_node_t *tree_node, int octant, 
     return child_node;
 }
 
-static octree_node_t *octree_add_node(octree_node_t *root_node, scene_node_t *scene_node, octree_node_t **free_nodes)
+static octree_node_t *octree_add_node(octree_node_t *root_node, spacepart_node_t *spacepart_node, octree_node_t **free_nodes)
 {
-    assert(scene_node->next == scene_node && scene_node->prev == scene_node);
-    assert(scene_node->octree_node == NULL);
+    assert(spacepart_node->next == spacepart_node && spacepart_node->prev == spacepart_node);
+    assert(spacepart_node->octree_node == NULL);
 
     octree_node_t *node = root_node;
     int octant = -1;
 
     while(true)
     {
-        octant = octree_select_octant(node, scene_node->aabb_min, scene_node->aabb_max);
+        octant = octree_select_octant(node, spacepart_node->aabb_min, spacepart_node->aabb_max);
         if(octant != -1 && node->children[octant]) node = node->children[octant];
         else break;
     }
 
-    if(octant == -1) octree_add_node_root(node, scene_node);
-    else if(node->num_child_nodes != -1) octree_add_node_child(node, scene_node, octant);
+    if(octant == -1) octree_add_node_root(node, spacepart_node);
+    else if(node->num_child_nodes != -1) octree_add_node_child(node, spacepart_node, octant);
     else
     {
         octree_node_t *child_node = octree_split_octant(node, octant, free_nodes);
         if(child_node)
-            return octree_add_node(child_node, scene_node, free_nodes);
+            return octree_add_node(child_node, spacepart_node, free_nodes);
         else
-            octree_add_node_child(node, scene_node, octant);
+            octree_add_node_child(node, spacepart_node, octant);
     }
 
     return node;
@@ -115,7 +115,7 @@ static void octree_split(octree_node_t *tree_node, octree_node_t **free_nodes)
 
     while(tree_node->child_nodes)
     {
-        scene_node_t *node = tree_node->child_nodes;
+        spacepart_node_t *node = tree_node->child_nodes;
         int octant = node->octant;
         assert(octant != -1);
 
@@ -126,7 +126,7 @@ static void octree_split(octree_node_t *tree_node, octree_node_t **free_nodes)
         if(!child_node)
             return;
 
-        tree_node->child_nodes = scene_node_detach(node);
+        tree_node->child_nodes = spacepart_node_detach(node);
 
         node->octree_node = NULL;
         node->octant = -1;
@@ -135,19 +135,19 @@ static void octree_split(octree_node_t *tree_node, octree_node_t **free_nodes)
     }
 }
 
-static void octree_remove_node(octree_node_t *tree_node, scene_node_t *scene_node)
+static void octree_remove_node(octree_node_t *tree_node, spacepart_node_t *spacepart_node)
 {
-    if(scene_node->octant == -1) tree_node->num_nodes -= 1;
+    if(spacepart_node->octant == -1) tree_node->num_nodes -= 1;
     else tree_node->num_child_nodes -= 1;
 
-    scene_node_t *next = scene_node->next == scene_node ? NULL : scene_node->next;
-    scene_node->prev->next = scene_node->next;
-    scene_node->next->prev = scene_node->prev;
-    scene_node->octree_node = NULL;
-    scene_node->octant = -1;
+    spacepart_node_t *next = spacepart_node->next == spacepart_node ? NULL : spacepart_node->next;
+    spacepart_node->prev->next = spacepart_node->next;
+    spacepart_node->next->prev = spacepart_node->prev;
+    spacepart_node->octree_node = NULL;
+    spacepart_node->octant = -1;
 
-    if(tree_node->nodes == scene_node) tree_node->nodes = next;
-    if(tree_node->child_nodes == scene_node) tree_node->child_nodes = next;
+    if(tree_node->nodes == spacepart_node) tree_node->nodes = next;
+    if(tree_node->child_nodes == spacepart_node) tree_node->child_nodes = next;
 }
 
 static void octree_merge(octree_node_t *tree_node, octree_node_t **free_nodes)
@@ -209,17 +209,17 @@ static bool octree_should_split(octree_node_t *node)
     return node->num_child_nodes >= OCTREE_SPLIT_THRESHOLD;
 }
 
-void octree_add(octree_node_t *root_node, struct scene_node_t *scene_node, octree_node_t **free_nodes)
+void octree_add(octree_node_t *root_node, struct spacepart_node_t *spacepart_node, octree_node_t **free_nodes)
 {
-    octree_node_t *tree_node = octree_add_node(root_node, scene_node, free_nodes);
+    octree_node_t *tree_node = octree_add_node(root_node, spacepart_node, free_nodes);
     if(octree_should_split(tree_node))
         octree_split(tree_node, free_nodes);
 }
 
-void octree_remove(struct scene_node_t *scene_node, octree_node_t **free_nodes)
+void octree_remove(struct spacepart_node_t *spacepart_node, octree_node_t **free_nodes)
 {
-    octree_node_t *tree_node = scene_node->octree_node;
-    octree_remove_node(tree_node, scene_node);
+    octree_node_t *tree_node = spacepart_node->octree_node;
+    octree_remove_node(tree_node, spacepart_node);
     if(tree_node->parent && octree_should_merge(tree_node->parent))
         octree_merge(tree_node->parent, free_nodes);
 }

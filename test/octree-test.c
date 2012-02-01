@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <spacepart/scene.h>
+#include <spacepart/spacepart.h>
 #include <spacepart/octree.h>
 
 static float rnd(float x)
@@ -31,12 +31,12 @@ int main()
     octree_node_t *free_octree_nodes = octree_nodes+0;
 
     int num_nodes = 128*1024;
-    scene_node_t *nodes = calloc(num_nodes, sizeof(scene_node_t));
+    spacepart_node_t *nodes = calloc(num_nodes, sizeof(spacepart_node_t));
 
     const float min_size = 1, max_size = 100;
-    for(scene_node_t *node = nodes; node != nodes + num_nodes; ++node)
+    for(spacepart_node_t *node = nodes; node != nodes + num_nodes; ++node)
     {
-        memset(node, 0, sizeof(scene_node_t));
+        memset(node, 0, sizeof(spacepart_node_t));
         node->next = node->prev = node;
 
         for(int i = 0; i < 3; ++i)
@@ -49,7 +49,7 @@ int main()
         octree_add(&octree_root, node, &free_octree_nodes);
     }
 
-    for(scene_node_t *node = nodes; node != nodes + num_nodes; ++node)
+    for(spacepart_node_t *node = nodes; node != nodes + num_nodes; ++node)
         octree_remove(node, &free_octree_nodes);
 
     free(nodes);

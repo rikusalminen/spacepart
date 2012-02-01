@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <spacepart/scene.h>
+#include <spacepart/spacepart.h>
 #include <spacepart/renderq.h>
 #include <spacepart/octree.h>
 #include <spacepart/frustum.h>
@@ -40,25 +40,25 @@ int main()
         node->parent = node+1 == octree_nodes+num_octree_nodes ? NULL : node+1;
     octree_node_t *free_octree_nodes = octree_nodes+0;
 
-    int num_scene_nodes = 1024*32;
-    scene_node_t *scene_nodes = calloc(num_scene_nodes, sizeof(scene_node_t));
+    int num_spacepart_nodes = 1024*32;
+    spacepart_node_t *spacepart_nodes = calloc(num_spacepart_nodes, sizeof(spacepart_node_t));
 
     const float min_size = 1, max_size = 100;
-    for(scene_node_t *scene_node = scene_nodes + 0; scene_node != scene_nodes + num_scene_nodes; ++scene_node)
+    for(spacepart_node_t *spacepart_node = spacepart_nodes + 0; spacepart_node != spacepart_nodes + num_spacepart_nodes; ++spacepart_node)
     {
-        scene_node->next = scene_node->prev = scene_node;
+        spacepart_node->next = spacepart_node->prev = spacepart_node;
 
         for(int i = 0; i < 3; ++i)
         {
             float size = min_size + rnd(max_size - min_size);
-            scene_node->aabb_min[i] = rnd(2.0 * world_size - size) - world_size;
-            scene_node->aabb_max[i] = scene_node->aabb_min[i] + size;
+            spacepart_node->aabb_min[i] = rnd(2.0 * world_size - size) - world_size;
+            spacepart_node->aabb_max[i] = spacepart_node->aabb_min[i] + size;
         }
 
-        octree_add(&octree_root, scene_node, &free_octree_nodes);
+        octree_add(&octree_root, spacepart_node, &free_octree_nodes);
     }
 
-    int num_queue_nodes = num_scene_nodes;
+    int num_queue_nodes = num_spacepart_nodes;
     renderq_node_t *queue_nodes = calloc(num_queue_nodes, sizeof(renderq_node_t));
 
     renderq_node_t *free_nodes = 0;
@@ -86,11 +86,11 @@ int main()
 
     assert(count == num_queue_nodes);
 
-    for(scene_node_t *scene_node = scene_nodes + 0; scene_node != scene_nodes + num_scene_nodes; ++scene_node)
-        octree_remove(scene_node, &free_octree_nodes);
+    for(spacepart_node_t *spacepart_node = spacepart_nodes + 0; spacepart_node != spacepart_nodes + num_spacepart_nodes; ++spacepart_node)
+        octree_remove(spacepart_node, &free_octree_nodes);
 
     free(queue_nodes);
-    free(scene_nodes);
+    free(spacepart_nodes);
     free(octree_nodes);
 
     return 0;

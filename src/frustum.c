@@ -3,7 +3,7 @@
 
 #include <spacepart/renderq.h>
 #include <spacepart/octree.h>
-#include <spacepart/scene.h>
+#include <spacepart/spacepart.h>
 
 typedef enum {
     FRUSTUM_OUTSIDE = 0,
@@ -54,18 +54,18 @@ static float frustum_cull_depth(
 static renderq_node_t *frustum_cull_nodes(
     const float * restrict frustum,
     frustum_cull_t visibility,
-    const scene_node_t *list,
+    const spacepart_node_t *list,
     renderq_node_t **free_nodes)
 {
     if(!list) return NULL;
 
     renderq_node_t *queue = NULL;
-    const scene_node_t *scene_node = list;
+    const spacepart_node_t *spacepart_node = list;
     do
     {
         frustum_cull_t node_visibility =
             visibility == FRUSTUM_INTERSECTS ?
-            frustum_cull_aabb(frustum, scene_node->aabb_min, scene_node->aabb_max) :
+            frustum_cull_aabb(frustum, spacepart_node->aabb_min, spacepart_node->aabb_max) :
             visibility;
 
         if(node_visibility != FRUSTUM_OUTSIDE)
@@ -74,15 +74,15 @@ static renderq_node_t *frustum_cull_nodes(
             if(!queue_node) break;
             *free_nodes = renderq_detach(*free_nodes);
 
-            queue_node->key = frustum_cull_depth(frustum, scene_node->aabb_min, scene_node->aabb_max);
-            queue_node->scene_node = scene_node;
+            queue_node->key = frustum_cull_depth(frustum, spacepart_node->aabb_min, spacepart_node->aabb_max);
+            queue_node->spacepart_node = spacepart_node;
             queue_node->degree = 0;
 
             queue = renderq_join_siblings(queue, queue_node);
         }
 
-        scene_node = scene_node->next;
-    } while (scene_node != list);
+        spacepart_node = spacepart_node->next;
+    } while (spacepart_node != list);
 
     return renderq_compress(queue);
 }

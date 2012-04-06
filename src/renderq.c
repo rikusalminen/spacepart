@@ -44,24 +44,9 @@ static renderq_node_t *renderq_combine(renderq_node_t *a, renderq_node_t *b)
     return parent;
 }
 
-
-static int highest_1_bit(uint64_t word)
-{
-    int low = 0, high = 64;
-    while(low != high)
-    {
-        int mid = low + (high - low) / 2;
-        uint64_t mask = ~(0ull) << mid;
-        if(word & mask) low = mid+1;
-        else high = mid;
-    }
-
-    return low-1;
-}
-
 static void renderq_degree_bounds(renderq_node_t *root, int *min_deg, int *max_deg)
 {
-    uint64_t degree_mask = 0;
+    uint32_t degree_mask = 0;
     int minimum = 64;
     renderq_node_t *node = root;
 
@@ -72,7 +57,7 @@ static void renderq_degree_bounds(renderq_node_t *root, int *min_deg, int *max_d
         node = node->next;
     } while(node != root);
 
-    *max_deg = highest_1_bit(degree_mask);
+    *max_deg = 31 - __builtin_clz(degree_mask); // find highest 1 bit
     *min_deg = minimum;
 }
 

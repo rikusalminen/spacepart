@@ -143,6 +143,7 @@ static void octree_remove_node(octree_node_t *tree_node, spacepart_node_t *space
     spacepart_node_t *next = spacepart_node->next == spacepart_node ? NULL : spacepart_node->next;
     spacepart_node->prev->next = spacepart_node->next;
     spacepart_node->next->prev = spacepart_node->prev;
+    spacepart_node->next = spacepart_node->prev = spacepart_node;
     spacepart_node->octree_node = NULL;
     spacepart_node->octant = -1;
 

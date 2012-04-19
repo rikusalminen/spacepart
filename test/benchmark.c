@@ -39,7 +39,8 @@ static int run_benchmarks(
     spacepart_node_t *spacepart_nodes,
     const int num_spacepart_nodes,
     renderq_node_t **free_renderq_nodes,
-    const int num_renderq_nodes
+    const int num_renderq_nodes,
+    const float *frustum
     )
 {
     struct timespec timestamps[6];
@@ -64,24 +65,18 @@ static int run_benchmarks(
     clock_gettime(CLOCK_MONOTONIC, &timestamps[stamp]);
     stamp++;
 
-    const float frustum[] = {
-        -1.0, 0.0, 0.0, world_size,
-        1.0, 0.0, 0.0, world_size,
-        0.0, -1.0, 0.0, world_size,
-        0.0, 1.0, 0.0, world_size,
-        0.0, 0.0, -1.0, world_size,
-        0.0, 0.0, 1.0, world_size,
-    };
 
     renderq_node_t *renderq = frustum_cull_octree(frustum, octree_root, free_renderq_nodes);
 
     clock_gettime(CLOCK_MONOTONIC, &timestamps[stamp]);
     stamp++;
 
+    int queue_size = 0;
     while(renderq)
     {
         renderq_node_t *node = renderq_extract_min(&renderq);
         *free_renderq_nodes = renderq_join_siblings(*free_renderq_nodes, node);
+        ++queue_size;
     }
 
     clock_gettime(CLOCK_MONOTONIC, &timestamps[stamp]);
@@ -93,7 +88,9 @@ static int run_benchmarks(
     clock_gettime(CLOCK_MONOTONIC, &timestamps[stamp]);
     stamp++;
 
+
     printf("%8d\t", num_spacepart_nodes);
+    printf("%8d\t", queue_size);
     for(int s = 0; s < stamp-1; ++s)
         printf("%10lu\t", timespec_diff(&timestamps[s], &timestamps[s+1]));
 
@@ -135,16 +132,40 @@ static int benchmark(int num_octree_nodes, int num_spacepart_nodes, int num_rend
         free_renderq_nodes = renderq_join_siblings(free_renderq_nodes, node);
     }
 
+    float matrix[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    };
+
+    frustum_perspective(matrix, M_PI/4.0, 4.0/3.0, 0.1, 1000.0);
+    float z = 500.0; // translate camera backwards
+    matrix[14] += matrix[10] * z;
+    matrix[15] = matrix[11] * z;
+
+    float frustum[] = {
+        -1.0, 0.0, 0.0, world_size,
+        1.0, 0.0, 0.0, world_size,
+        0.0, -1.0, 0.0, world_size,
+        0.0, 1.0, 0.0, world_size,
+        0.0, 0.0, -1.0, world_size,
+        0.0, 0.0, 1.0, world_size,
+    };
+
+    frustum_planes(frustum, matrix);
+
     int err = 0;
 
-    const char *titles[] = { "nodes", "add", "mutate", "cull", "flatten", "remove" };
+    const char *titles[] = { "nodes", "queue", "add", "mutate", "cull", "flatten", "remove", "total" };
     for(int s = 0; s < sizeof(titles)/sizeof(*titles); ++s)
-        printf("%s\t", titles[s]);
+        printf("%10s\t", titles[s]);
     printf("\n");
 
-    for(int i = 0; i < 100; ++i)
+    int num_samples = 20;
+    for(int i = 0; i < num_samples; ++i)
     {
-        err |= run_benchmarks(octree_root, &free_octree_nodes, num_octree_nodes, spacepart_nodes, (i+1)*num_spacepart_nodes/100, &free_renderq_nodes, num_renderq_nodes);
+        err |= run_benchmarks(octree_root, &free_octree_nodes, num_octree_nodes, spacepart_nodes, (i+1)*num_spacepart_nodes/num_samples, &free_renderq_nodes, num_renderq_nodes, frustum);
     }
 
     free(octree_nodes);
